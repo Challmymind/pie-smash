@@ -9,7 +9,7 @@ it to my desire bin path. <br>
 **__this was only tested on FreeBSD 13.2 but should be working also with linux__**
 
 ### Step 0:
-Create manually 2 file in your HOME path: ```.config/pie-smash/pie-smash.conf``` and ```.config/pie-smash/user-apps-data.json```. <br>
+Create manually 2 files in your HOME path: ```.config/pie-smash/pie-smash.conf``` and ```.config/pie-smash/user-apps-data.json```. <br>
 > mkdir -p ~/.config/pie-smash <br>
 > touch .config/pie-smash/pie-smash.conf .config/pie-smash/user-apps-data.json <br>
 
