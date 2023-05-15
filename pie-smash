@@ -4,8 +4,11 @@ import sys
 import os
 import json
 import datetime
-import shutil
 
+PIE_SMASH_VERSION = 0.1
+if len(sys.argv) == 2:
+    if sys.argv[1] == "--version":
+        print("pie-smash version: {}".format(PIE_SMASH_VERSION))
 
 # PATHS.
 PIESMASH_DIR = ".config/pie-smash"
@@ -22,7 +25,30 @@ CONFIG_PATH = os.path.normpath(CONFIG_PATH)
 DATABASE_PATH = os.path.join(HOME, PIESMASH_DIR, DATABASE_NAME)
 DATABASE_PATH = os.path.normpath(DATABASE_PATH)
 
-        
+# Error handling.
+# Critical:
+def crit_err(reason):
+    CRIT_ERR_MSG = "Aborting execution. Reason: {}".format(reason)
+    print(CRIT_ERR_MSG, file=sys.stderr)
+    sys.exit(1)
+# Recoverable:
+def min_err(reason, action):
+    MIN_ERR_MSG = "Encountered some error. Reason: {}\n Action: {}".format(reason, action)
+    print(MIN_ERR_MSG, file=sys.stderr)
+
+def get_answer():
+    while True:
+       answer = input("Answer y/n:")[0].lower() 
+       if answer == 'y':
+           return True
+
+       elif answer == 'n':
+           return False
+
+       else:
+           print("Unknown answer, try again")
+           continue
+
     
 
 # Parent class for all file classes.
@@ -37,8 +63,7 @@ class FileHandler:
             with open(self.path, "r") as fdata:
                 self.data = json.loads(fdata.read())
         except FileNotFoundError:
-            print("No {} file".format(self.file_type))
-            sys.exit(1)
+            crit_err("No file of type {}".format(file_type))
 
 # Config class.
 class Config(FileHandler):
@@ -48,16 +73,13 @@ class Config(FileHandler):
         try:
             super().__init__(path)
             if not "bin_path" in self.data:
-                print("No bin path in config")
-                sys.exit(1)
+                crit_err("No bin path in config file")
             else:
                 self.bin_path = self.data["bin_path"]
             if not os.path.isdir(self.bin_path):
-                print("Incorrect bin path in config")
-                sys.exit(1)
+                crit_err("Incorrect bin path in config")
         except json.decoder.JSONDecodeError:
-            print("Invalid JSON in config file")
-            sys.exit(1)
+            crit_err("Invalid JSON in config file")
 
 # Database class.
 class Database(FileHandler):
@@ -68,23 +90,10 @@ class Database(FileHandler):
         try:
             super().__init__(path)
         except json.decoder.JSONDecodeError:
-            print("Bad database. Format?")
-            while True:
-                answer = input("Answer y/n:")[0].lower() 
-                if answer == 'y':
-                    print("Formatting...")
-                    break
-
-                elif answer == 'n':
-                    print("Aborting")
-                    sys.exit(1)
-
-                else:
-                    print("Unknown answer, try again")
-                    continue
+            min_err("Bad database", "Should format?")
+            if not get_answer():
+                crit_err("Cannot continue without formating database")
             self.data = dict()
-            
-
 
     def to_file(self):
         print("Writing data...")
@@ -92,14 +101,25 @@ class Database(FileHandler):
             with open(self.path, "w") as file:
                 file.write(json.dumps(self.data))
         except FileNotFoundError:
-            print("No {} file".format(self.file_type))
-            sys.exit(1)
+            crit_err("No file of type {}".format(file_type))
 
-
-    def list(self):
-        return self.DatabaseIter(self.data)
+    def __iter__(self):
+        self.list = list(self.data.keys())
+        self.len = len(self.data.keys())
+        self.i = 0
+        return self
+    def __next__(self):
+        if self.i < self.len:
+            name = self.list[self.i]
+            date = self.data[name]["date"]
+            path = self.data[name]["path"]
+            self.i += 1
+            return (name, date, path)
+        else:
+            raise StopIteration
 
     def add_entry(self, path):
+
         name = os.path.basename(path)
         if name in self.data:
             if ("path" in self.data[name]) and (self.data[name].get("path",0) == path):
@@ -111,23 +131,12 @@ class Database(FileHandler):
                     print("Entry date: {}".format(self.data[name]["date"]))
                 print("Existing entry {} with diffrent path. Overwrite ?".format(name))
 
+            if not get_answer():
+                return False
 
-            while True:
-                answer = input("Answer y/n:")[0].lower() 
-                if answer == 'y':
-                    break
-
-                elif answer == 'n':
-                    print("Aborting")
-                    return False
-
-                else:
-                    print("Unknown answer, try again")
-                    continue
         else:
-            if self.exmanager.exist(path):
-                print("Aborting, file exists without entry in database")
-                sys.exit(1)
+            if self.exmanager.exist_in_bin(path):
+                crit_err("File exists in bin without entry in database")
 
 
         self.data[name] = {}
@@ -140,52 +149,32 @@ class Database(FileHandler):
     def delete_entry(self, path):
         name = os.path.basename(path)
         if not name in self.data:
-            print("Aborting, no such entry in database")
-            sys.exit(1)
+            crit_err("No entry of {} in database".format(name))
         if (not "path" in self.data[name]) or (self.data[name].get("path",0) != path):
-            print("Aborting, wrong path in database")
-            sys.exit(1)
-        if not self.exmanager.exist(path):
-            print("No such file in bin")
-            sys.exit(1)
+            crit_err("Wrong path in database")
         self.exmanager.delete(path)
         del self.data[name]
         return True
 
-    class DatabaseIter:
-        def __init__(self, data):
-            self.data = data
-            self.list = list(data.keys())
-            self.len = len(self.data.keys())
-        def __iter__(self):
-            self.i = 0
-            return self
-        def __next__(self):
-            if self.i < self.len:
-                name = self.list[self.i]
-                date = self.data[name]["date"]
-                path = self.data[name]["path"]
-                self.i += 1
-                return (name, date, path)
-            else:
-                raise StopIteration
-
     class ExecManager:
+
         def __init__(self, path):
             self.bin = path
     
-        def exist(self, path):
+        def exist_in_bin(self, path):
             name = os.path.basename(path)
             return os.path.isfile(os.path.join(self.bin, name))
     
         def copy(self, path):
-            print("Copied to: {}".format(shutil.copy(path, self.bin)))
+            name = os.path.basename(path)
+            dst = os.path.join(self.bin, name)
+            os.symlink(path, dst)
+            print("Created symlink to: {}".format(dst))
 
         def delete(self, path):
             name = os.path.basename(path)
-            if not os.path.isfile(path):
-                print("Something went wrong")
-                sys.exit(1)
+            if not self.exist_in_bin(path):
+                crit_err("No such file in bin")
             os.remove(os.path.join(self.bin, name))
 
 def pretty_list_print(name, date, path):
@@ -208,33 +197,33 @@ def main():
     database = Database(DATABASE_PATH, config.bin_path)
 
     if len(sys.argv) < 2:
-        print("Not enough arguments")
-        sys.exit(1)
+        crit_err("Not enough arguments")
+
+
     if sys.argv[1] == "list":
         print("{: <26}{: <21}{}".format("NAME", "DATE", "PATH"))
-        for (x,y,z) in database.list():
+        for (x,y,z) in database:
               pretty_list_print(x,y,z)
 
-    if sys.argv[1] == "add":
+    elif sys.argv[1] == "add":
         if len(sys.argv) == 3:
             appPath = os.path.join(PWD, sys.argv[2])
             if not os.path.isfile(appPath):
-                print("No such file")
-                sys.exit(1)
+                crit_err("There is no {} file".format(appPath))
 
             if database.add_entry(appPath):
                 database.to_file()
 
-    if sys.argv[1] == "delete":
+    elif sys.argv[1] == "delete":
         if len(sys.argv) == 3:
             appPath = os.path.join(PWD, sys.argv[2])
             if not os.path.isfile(appPath):
-                print("No such file")
-                sys.exit(1)
+                crit_err("There is no {} file".format(appPath))
 
             if database.delete_entry(appPath):
                 database.to_file()
-
+    else:
+        crit_err("Unknown command, try again")
     
 
 if __name__ == "__main__":
