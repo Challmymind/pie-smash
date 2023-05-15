@@ -15,7 +15,9 @@ Create manually 2 file in your HOME path: ```.config/pie-smash/pie-smash.conf```
 
 ### Step 1:
 Add bin_path entry to pie-smash.conf, this is the path where manager will create symlinks. <br>
-> echo " { \"bin_path\": \"__YOUR/DESIRED/BIN/PATH__\" }" >> .config/pie-smash/pie-smash.conf
+> echo " { \"bin_path\": \"__YOUR/DESIRED/BIN/PATH__\" }" >> .config/pie-smash/pie-smash.conf <br>
+
+
 Also add brackets to database. <br>
 > echo "{}" >> .config/pie-smash/user-apps-data.json <br>
 
@@ -31,7 +33,9 @@ Add this package manager using itself. Run this in your cloned pie-smash directo
 
 ### Check your installation. 
 Run list option and check output. <br> 
-> pie-smash list
+> pie-smash list <br>
+
+
 If you have seen pie-smash entry then everything is correct. <br> 
 
 ## Currectly working commands.
