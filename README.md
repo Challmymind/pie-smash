@@ -15,7 +15,7 @@ Create manually 2 files in your HOME path: ```.config/pie-smash/pie-smash.conf``
 
 ### Step 1:
 Add bin_path entry to pie-smash.conf, this is the path where manager will create symlinks. <br>
-> echo " { \"bin_path\": \"__YOUR/DESIRED/BIN/PATH__\" }" >> .config/pie-smash/pie-smash.conf <br>
+> echo " { \\"bin_path\\": \\"__YOUR/DESIRED/BIN/PATH__\\" }" >> .config/pie-smash/pie-smash.conf <br>
 
 
 Also add brackets to database. <br>
